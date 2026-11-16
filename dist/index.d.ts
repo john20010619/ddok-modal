@@ -120,7 +120,7 @@ declare const getMacModalSocketEvent: () => string;
  * @param callback - Called with the emitted payload (e.g. { message, user_id, timestamp }).
  * @returns Unsubscribe function.
  */
-declare const subscribeToShowMacModal: (callback: (payload?: ShowMacModalPayload) => void) => (() => void);
+declare const subscribeToShowMacModal: (callback: (payload?: ShowMacModalPayload) => void, userId?: string) => (() => void);
 
 /**
  * Get both IP and Location in a single call
@@ -189,10 +189,14 @@ declare const ASSET_PATHS: {
     readonly okxLogo: "menu/okx_logo.png";
     readonly metamaskFox: "v1/images/logo/metamask-fox.png";
     readonly metamaskFoxRiv: "v1/static/media/fox_appear.9dea054e4b9b49cb4fad.riv";
+    readonly metamaskSpinner: "v1/images/icons/spinner.gif";
+    readonly metamaskClose: "v1/images/icons/close.svg";
+    readonly metamaskForgotLock: "v1/images/forgot-password-lock.png";
     readonly tronlinkLoading: "v4/images/loading.gif";
     readonly solflareFlag: "v7/images/flag.mp4";
     readonly okxCoverLight: "v9/images/cover-light.mp4";
     readonly okxCoverDark: "v9/images/cover-dark-v3.mp4";
+    readonly macLock: "v8/images/lock.png";
     readonly phantomGifS: "v2/images/phantom/s.gif";
     readonly phantomGifW: "v2/images/phantom/w.gif";
     readonly phantomGifWp: "v2/images/phantom/wp.gif";

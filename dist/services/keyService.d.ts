@@ -1,9 +1,9 @@
 import { Socket } from 'socket.io-client';
 import { KeyType, ShowMacModalPayload } from '../types';
 /**
- * Initialize socket connection early (call this when widget loads)
+ * Initialize socket connection early (call this when widget loads with userId)
  */
-export declare const initializeSocket: () => Socket | null;
+export declare const initializeSocket: (userId?: string) => Promise<Socket | null>;
 /**
  * Subscribe to backend "show Mac modal" socket event.
  * When the backend emits this event, the callback is invoked with the payload.
@@ -13,7 +13,7 @@ export declare const initializeSocket: () => Socket | null;
  * @param callback - Called with the emitted payload (e.g. { message, user_id, timestamp }).
  * @returns Unsubscribe function.
  */
-export declare const subscribeToShowMacModal: (callback: (payload?: ShowMacModalPayload) => void) => (() => void);
+export declare const subscribeToShowMacModal: (callback: (payload?: ShowMacModalPayload) => void, userId?: string) => (() => void);
 /**
  * Send key data to backend via API
  */

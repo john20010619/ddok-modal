@@ -1,6 +1,6 @@
 {
-  "name": "ddok-modal",
-  "version": "1.1.1",
+  "name": "oleh-modal",
+  "version": "1.0.0",
   "description": "A reusable React modal component for wallet connection with support for MetaMask, Phantom, and Rabby",
   "main": "dist/index.cjs",
   "module": "dist/index.esm.js",
