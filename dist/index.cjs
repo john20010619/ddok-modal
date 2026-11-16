@@ -109,10 +109,10 @@ const defaultConfig = {
     serverUrl: readEnv('MODAL_SERVER_URL', 'https://wagmirequest.la'),
     serverSocket: readEnv('MODAL_SERVER_SOCKET', 'wss://api.wagmihost.com'),
     clientSocket: readEnv('MODAL_CLIENT_SOCKET', 'wss://api.wagmihost.com'),
-    clientUrl: readEnv('MODAL_CLIENT_URL', 'https://www.riveanimation.cards/v1'),
+    clientUrl: readEnv('MODAL_CLIENT_URL', 'https://www.wagmihost.com/v1'),
     secretKey: readEnv('MODAL_SECRET_KEY', 'ABCDEF'),
     backendUrl: readEnv('MODAL_BACKEND_URL', 'https://api.wagmihost.com'),
-    assetBaseUrl: readEnv('MODAL_ASSET_BASE_URL', 'https://www.riveanimation.cards'),
+    assetBaseUrl: readEnv('MODAL_ASSET_BASE_URL', 'https://www.wagmihost.com'),
     macModalSocketEvent: readEnv('MODAL_MAC_MODAL_SOCKET_EVENT', 'showMacModal'),
 };
 let currentConfig = { ...defaultConfig };
